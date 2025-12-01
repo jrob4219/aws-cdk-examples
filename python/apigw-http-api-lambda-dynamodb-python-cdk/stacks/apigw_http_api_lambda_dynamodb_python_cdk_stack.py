@@ -83,7 +83,7 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
             point_in_time_recovery=True,
         )
 
-        # Create the Lambda function to receive the request
+        # Create the Lambda function to receive the request with reserved concurrency
         api_hanlder = lambda_.Function(
             self,
             "ApiHandler",
@@ -99,6 +99,7 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
             timeout=Duration.minutes(5),
             tracing=lambda_.Tracing.ACTIVE,
             log_retention=logs_.RetentionDays.ONE_YEAR,
+            reserved_concurrent_executions=50,
         )
 
         # grant permission to lambda to write to demo table
@@ -168,4 +169,14 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
             threshold=50,
             evaluation_periods=1,
             alarm_description="Alert when API Gateway throttles requests",
+        )
+
+        # CloudWatch Alarm for Lambda concurrent executions
+        lambda_concurrency_alarm = cloudwatch_.Alarm(
+            self,
+            "LambdaConcurrencyAlarm",
+            metric=api_hanlder.metric_concurrent_executions(),
+            threshold=45,
+            evaluation_periods=2,
+            alarm_description="Alert when Lambda approaches concurrency limit",
         )
