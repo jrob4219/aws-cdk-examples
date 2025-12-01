@@ -13,6 +13,7 @@ from aws_cdk import (
     aws_logs as logs_,
     aws_wafv2 as wafv2_,
     Duration,
+    CfnOutput,
 )
 from constructs import Construct
 
@@ -138,6 +139,32 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
             ),
         )
 
+        # Usage Plan with per-client throttling
+        usage_plan = api.add_usage_plan(
+            "StandardUsagePlan",
+            name="StandardUsagePlan",
+            throttle=apigw_.ThrottleSettings(
+                rate_limit=50,
+                burst_limit=100
+            ),
+            quota=apigw_.QuotaSettings(
+                limit=10000,
+                period=apigw_.Period.DAY
+            )
+        )
+
+        usage_plan.add_api_stage(
+            stage=api.deployment_stage
+        )
+
+        # API Key
+        api_key = api.add_api_key(
+            "StandardApiKey",
+            api_key_name="StandardApiKey"
+        )
+
+        usage_plan.add_api_key(api_key)
+
         # AWS WAF Web ACL with rate-based rule
         web_acl = wafv2_.CfnWebACL(
             self,
@@ -238,4 +265,12 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
             threshold=100,
             evaluation_periods=1,
             alarm_description="Alert when WAF blocks excessive requests",
+        )
+
+        # Output API Key ID
+        CfnOutput(
+            self,
+            "ApiKeyId",
+            value=api_key.key_id,
+            description="API Key ID for StandardApiKey"
         )

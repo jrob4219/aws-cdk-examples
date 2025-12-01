@@ -45,6 +45,13 @@ This stack implements AWS Well-Architected Framework **REL05-BP02: Throttle requ
 
 These limits protect the API from sudden traffic spikes, retry storms, and flooding attacks. When limits are exceeded, API Gateway returns `429 Too Many Requests` responses.
 
+**API Gateway Usage Plan (Per-Client Throttling):**
+- **Rate Limit**: 50 requests per second per API key
+- **Burst Limit**: 100 requests per API key
+- **Daily Quota**: 10,000 requests per API key
+
+Usage plans enable per-client throttling and quotas, ensuring fair resource allocation among different API consumers and preventing a single client from monopolizing capacity.
+
 **AWS WAF Per-IP Rate Limiting:**
 - **Rate Limit**: 2000 requests per 5 minutes per IP address
 - **Action**: Block requests exceeding limit
@@ -55,6 +62,21 @@ AWS WAF provides an additional layer of protection by limiting requests from ind
 - **Reserved Concurrent Executions**: 50
 
 Reserved concurrency limits the maximum number of concurrent executions for this Lambda function, preventing it from consuming all available account-level concurrency and impacting other functions in the same account and region.
+
+### API Key Usage
+
+After deployment, retrieve your API key:
+```bash
+aws apigateway get-api-key --api-key <API_KEY_ID> --include-value
+```
+
+Include the API key in requests:
+```bash
+curl -X POST https://<API_ID>.execute-api.<REGION>.amazonaws.com/prod/ \
+  -H "x-api-key: <YOUR_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"year":"2023","title":"test","id":"12"}'
+```
 
 ### Monitoring Throttled Requests
 
@@ -131,7 +153,8 @@ $ cdk deploy --profile test
 ```
 
 ## After Deploy
-Navigate to AWS API Gateway console and test the API with below sample data 
+Navigate to AWS API Gateway console and test the API with below sample data. **Note:** You must include the `x-api-key` header with your API key value.
+
 ```json
 {
     "year":"2023", 
