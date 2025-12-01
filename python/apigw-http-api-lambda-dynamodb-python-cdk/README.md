@@ -69,6 +69,81 @@ Monitor throttled requests in CloudWatch:
 
 **Important:** These throttle values should be validated through load testing before production use. Adjust limits based on your workload's tested capacity.
 
+## Load Testing and Capacity Planning
+
+### Load Testing Requirements
+
+**IMPORTANT:** The throttle limits configured in this stack are baseline values and **must be validated through load testing** before production deployment. Load testing establishes the actual capacity of your workload and ensures throttle limits are set appropriately.
+
+### Recommended Load Testing Approach
+
+1. **Establish Baseline Metrics**
+   - Deploy the stack to a non-production environment
+   - Run initial tests with low traffic to establish baseline performance
+   - Monitor CloudWatch metrics for Lambda duration, DynamoDB capacity, and API Gateway latency
+
+2. **Conduct Load Tests**
+   - Use tools like Apache JMeter, Locust, or AWS Distributed Load Testing
+   - Gradually increase request rate to identify breaking points
+   - Test sustained load at 80% of expected peak capacity
+   - Test burst scenarios with sudden traffic spikes
+   - Monitor all CloudWatch metrics and alarms during tests
+
+3. **Key Metrics to Capture**
+   - Maximum sustained requests per second
+   - Maximum burst capacity
+   - Lambda concurrent executions at peak load
+   - Lambda function duration under load (average and P99)
+   - DynamoDB consumed read/write capacity units
+   - API Gateway response times (average and P99)
+   - Error rates and throttled request counts
+
+4. **Adjust Throttle Limits**
+   - Set API Gateway throttle limits to 80% of tested maximum capacity
+   - Configure Lambda reserved concurrency based on peak concurrent executions
+   - Adjust WAF rate limits based on legitimate traffic patterns observed
+   - Document all tested limits and the conditions under which they were established
+
+### Load Testing Best Practices
+
+- **Test Realistic Scenarios**: Use production-like data and request patterns
+- **Test Maximum Request Size**: Validate throttle limits with largest expected payloads
+- **Test Both Rate and Size Together**: Don't test maximum rate and maximum size separately
+- **Provision Matching Resources**: Ensure test environment resources match production
+- **Document Everything**: Record test methodology, results, and configurations
+- **Retest After Changes**: Re-run load tests after infrastructure or code changes
+- **Schedule Regular Testing**: Conduct load tests quarterly or after significant changes
+
+### Updating Throttle Limits
+
+**WARNING:** Do not increase throttle limits beyond tested capacity. When increasing limits:
+
+1. Verify current infrastructure can handle the increased load
+2. Conduct new load tests at the proposed higher limits
+3. Ensure provisioned resources (Lambda memory, DynamoDB capacity) are adequate
+4. Update limits incrementally and monitor production metrics
+5. Document the new tested capacity and test conditions
+
+### Example Load Test Command (using Apache Bench)
+
+```bash
+# Test sustained load - 50 requests/sec for 60 seconds
+ab -n 3000 -c 50 -t 60 \
+  -H "Content-Type: application/json" \
+  -p payload.json \
+  https://<API_ID>.execute-api.<REGION>.amazonaws.com/prod/
+
+# Monitor CloudWatch metrics during test
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/Lambda \
+  --metric-name ConcurrentExecutions \
+  --dimensions Name=FunctionName,Value=apigw_handler \
+  --start-time <START_TIME> \
+  --end-time <END_TIME> \
+  --period 60 \
+  --statistics Maximum
+```
+
 ## Setup
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
