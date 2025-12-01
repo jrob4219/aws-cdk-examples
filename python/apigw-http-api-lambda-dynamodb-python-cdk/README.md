@@ -33,6 +33,27 @@ aws cloudtrail start-logging --name my-trail
 
 All logs are retained for one year by default.
 
+## Throttling and Rate Limiting
+
+This stack implements AWS Well-Architected Framework **REL05-BP02: Throttle requests** best practice to protect against unexpected traffic spikes and resource exhaustion.
+
+### Configured Throttle Limits
+
+**API Gateway Stage-Level Throttling:**
+- **Rate Limit**: 100 requests per second
+- **Burst Limit**: 200 requests
+
+These limits protect the API from sudden traffic spikes, retry storms, and flooding attacks. When limits are exceeded, API Gateway returns `429 Too Many Requests` responses.
+
+### Monitoring Throttled Requests
+
+Monitor throttled requests in CloudWatch:
+- Navigate to CloudWatch Metrics → API Gateway
+- View `4XXError` metric for throttled request counts
+- CloudWatch Alarm triggers when throttle threshold is exceeded
+
+**Important:** These throttle values should be validated through load testing before production use. Adjust limits based on your workload's tested capacity.
+
 ## Setup
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
@@ -127,6 +148,7 @@ This stack includes comprehensive monitoring and logging:
 ### CloudWatch Alarms
 - **Lambda Error Alarm**: Triggers when function errors occur
 - **Lambda Duration Alarm**: Triggers when execution exceeds 10 seconds
+- **API Throttle Alarm**: Triggers when API Gateway throttles requests
 
 ## Cleanup 
 Run below script to delete AWS resources created by this sample stack.
