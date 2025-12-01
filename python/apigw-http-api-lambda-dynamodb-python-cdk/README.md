@@ -51,6 +51,11 @@ These limits protect the API from sudden traffic spikes, retry storms, and flood
 
 AWS WAF provides an additional layer of protection by limiting requests from individual IP addresses, preventing a single malicious actor or misconfigured client from consuming all available capacity.
 
+**Lambda Reserved Concurrency:**
+- **Reserved Concurrent Executions**: 50
+
+Reserved concurrency limits the maximum number of concurrent executions for this Lambda function, preventing it from consuming all available account-level concurrency and impacting other functions in the same account and region.
+
 ### Monitoring Throttled Requests
 
 Monitor throttled requests in CloudWatch:
@@ -58,6 +63,8 @@ Monitor throttled requests in CloudWatch:
 - View `4XXError` metric for throttled request counts
 - Navigate to CloudWatch Metrics → WAFV2
 - View `BlockedRequests` metric for WAF-blocked requests
+- Navigate to CloudWatch Metrics → Lambda
+- View `ConcurrentExecutions` metric to monitor function concurrency
 - CloudWatch Alarms trigger when thresholds are exceeded
 
 **Important:** These throttle values should be validated through load testing before production use. Adjust limits based on your workload's tested capacity.
@@ -157,6 +164,7 @@ This stack includes comprehensive monitoring and logging:
 - **Lambda Error Alarm**: Triggers when function errors occur
 - **Lambda Duration Alarm**: Triggers when execution exceeds 10 seconds
 - **API Throttle Alarm**: Triggers when API Gateway throttles requests
+- **Lambda Concurrency Alarm**: Triggers when function approaches concurrency limit (90% of reserved)
 - **WAF Blocked Requests Alarm**: Triggers when WAF blocks excessive requests
 
 ### AWS WAF
