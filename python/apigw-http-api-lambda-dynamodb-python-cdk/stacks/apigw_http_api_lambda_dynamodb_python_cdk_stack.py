@@ -9,6 +9,7 @@ from aws_cdk import (
     aws_apigateway as apigw_,
     aws_ec2 as ec2,
     aws_iam as iam,
+    aws_cloudwatch as cloudwatch_,
     Duration,
 )
 from constructs import Construct
@@ -81,15 +82,38 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
             ),
             memory_size=1024,
             timeout=Duration.minutes(5),
+            tracing=lambda_.Tracing.ACTIVE,
         )
 
         # grant permission to lambda to write to demo table
         demo_table.grant_write_data(api_hanlder)
         api_hanlder.add_environment("TABLE_NAME", demo_table.table_name)
 
-        # Create API Gateway
-        apigw_.LambdaRestApi(
+        # Create API Gateway with X-Ray tracing enabled
+        api = apigw_.LambdaRestApi(
             self,
             "Endpoint",
             handler=api_hanlder,
+            deploy_options=apigw_.StageOptions(
+                tracing_enabled=True,
+            ),
+        )
+
+        # CloudWatch Alarms for proactive monitoring
+        lambda_error_alarm = cloudwatch_.Alarm(
+            self,
+            "LambdaErrorAlarm",
+            metric=api_hanlder.metric_errors(),
+            threshold=1,
+            evaluation_periods=1,
+            alarm_description="Alert when Lambda function errors occur",
+        )
+
+        lambda_duration_alarm = cloudwatch_.Alarm(
+            self,
+            "LambdaDurationAlarm",
+            metric=api_hanlder.metric_duration(),
+            threshold=Duration.seconds(10).to_milliseconds(),
+            evaluation_periods=2,
+            alarm_description="Alert when Lambda duration exceeds 10 seconds",
         )
