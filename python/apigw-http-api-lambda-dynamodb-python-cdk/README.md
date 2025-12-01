@@ -33,6 +33,35 @@ aws cloudtrail start-logging --name my-trail
 
 All logs are retained for one year by default.
 
+## Throttling and Rate Limiting
+
+This stack implements AWS Well-Architected Framework **REL05-BP02: Throttle requests** best practice to protect against unexpected traffic spikes and resource exhaustion.
+
+### Configured Throttle Limits
+
+**API Gateway Stage-Level Throttling:**
+- **Rate Limit**: 100 requests per second
+- **Burst Limit**: 200 requests
+
+These limits protect the API from sudden traffic spikes, retry storms, and flooding attacks. When limits are exceeded, API Gateway returns `429 Too Many Requests` responses.
+
+**AWS WAF Per-IP Rate Limiting:**
+- **Rate Limit**: 2000 requests per 5 minutes per IP address
+- **Action**: Block requests exceeding limit
+
+AWS WAF provides an additional layer of protection by limiting requests from individual IP addresses, preventing a single malicious actor or misconfigured client from consuming all available capacity.
+
+### Monitoring Throttled Requests
+
+Monitor throttled requests in CloudWatch:
+- Navigate to CloudWatch Metrics → API Gateway
+- View `4XXError` metric for throttled request counts
+- Navigate to CloudWatch Metrics → WAFV2
+- View `BlockedRequests` metric for WAF-blocked requests
+- CloudWatch Alarms trigger when thresholds are exceeded
+
+**Important:** These throttle values should be validated through load testing before production use. Adjust limits based on your workload's tested capacity.
+
 ## Setup
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
@@ -127,6 +156,13 @@ This stack includes comprehensive monitoring and logging:
 ### CloudWatch Alarms
 - **Lambda Error Alarm**: Triggers when function errors occur
 - **Lambda Duration Alarm**: Triggers when execution exceeds 10 seconds
+- **API Throttle Alarm**: Triggers when API Gateway throttles requests
+- **WAF Blocked Requests Alarm**: Triggers when WAF blocks excessive requests
+
+### AWS WAF
+- Navigate to AWS WAF console to view blocked requests
+- Review sampled requests to identify attack patterns
+- Adjust rate limits based on legitimate traffic patterns
 
 ## Cleanup 
 Run below script to delete AWS resources created by this sample stack.
