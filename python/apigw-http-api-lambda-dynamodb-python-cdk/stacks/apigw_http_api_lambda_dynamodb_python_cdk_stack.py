@@ -11,6 +11,7 @@ from aws_cdk import (
     aws_iam as iam,
     aws_cloudwatch as cloudwatch_,
     aws_logs as logs_,
+    aws_wafv2 as wafv2_,
     Duration,
 )
 from constructs import Construct
@@ -112,12 +113,14 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
             retention=logs_.RetentionDays.ONE_YEAR,
         )
 
-        # Create API Gateway with X-Ray tracing and access logging enabled
+        # Create API Gateway with X-Ray tracing, access logging, and throttling enabled
         api = apigw_.LambdaRestApi(
             self,
             "Endpoint",
             handler=api_hanlder,
             deploy_options=apigw_.StageOptions(
+                throttling_rate_limit=100,
+                throttling_burst_limit=200,
                 tracing_enabled=True,
                 access_log_destination=apigw_.LogGroupLogDestination(api_log_group),
                 access_log_format=apigw_.AccessLogFormat.json_with_standard_fields(
@@ -132,6 +135,45 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
                     user=True,
                 ),
             ),
+        )
+
+        # AWS WAF Web ACL with rate-based rule
+        web_acl = wafv2_.CfnWebACL(
+            self,
+            "ApiWaf",
+            scope="REGIONAL",
+            default_action=wafv2_.CfnWebACL.DefaultActionProperty(allow={}),
+            visibility_config=wafv2_.CfnWebACL.VisibilityConfigProperty(
+                cloud_watch_metrics_enabled=True,
+                metric_name="ApiWafMetrics",
+                sampled_requests_enabled=True
+            ),
+            rules=[
+                wafv2_.CfnWebACL.RuleProperty(
+                    name="RateLimitRule",
+                    priority=1,
+                    statement=wafv2_.CfnWebACL.StatementProperty(
+                        rate_based_statement=wafv2_.CfnWebACL.RateBasedStatementProperty(
+                            limit=2000,
+                            aggregate_key_type="IP"
+                        )
+                    ),
+                    action=wafv2_.CfnWebACL.RuleActionProperty(block={}),
+                    visibility_config=wafv2_.CfnWebACL.VisibilityConfigProperty(
+                        cloud_watch_metrics_enabled=True,
+                        metric_name="RateLimitRule",
+                        sampled_requests_enabled=True
+                    )
+                )
+            ]
+        )
+
+        # Associate WAF with API Gateway
+        wafv2_.CfnWebACLAssociation(
+            self,
+            "WafApiAssociation",
+            resource_arn=f"arn:aws:apigateway:{self.region}::/restapis/{api.rest_api_id}/stages/{api.deployment_stage.stage_name}",
+            web_acl_arn=web_acl.attr_arn
         )
 
         # CloudWatch Alarms for proactive monitoring
@@ -151,4 +193,38 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
             threshold=Duration.seconds(10).to_milliseconds(),
             evaluation_periods=2,
             alarm_description="Alert when Lambda duration exceeds 10 seconds",
+        )
+
+        # CloudWatch Alarm for API Gateway throttled requests
+        api_throttle_alarm = cloudwatch_.Alarm(
+            self,
+            "ApiThrottleAlarm",
+            metric=cloudwatch_.Metric(
+                namespace="AWS/ApiGateway",
+                metric_name="Count",
+                dimensions_map={"ApiName": api.rest_api_name},
+                statistic="Sum"
+            ).with_label("4XXError"),
+            threshold=50,
+            evaluation_periods=1,
+            alarm_description="Alert when API Gateway throttles requests",
+        )
+
+        # CloudWatch Alarm for WAF blocked requests
+        waf_blocked_alarm = cloudwatch_.Alarm(
+            self,
+            "WafBlockedRequestsAlarm",
+            metric=cloudwatch_.Metric(
+                namespace="AWS/WAFV2",
+                metric_name="BlockedRequests",
+                dimensions_map={
+                    "Rule": "RateLimitRule",
+                    "WebACL": "ApiWaf",
+                    "Region": self.region
+                },
+                statistic="Sum"
+            ),
+            threshold=100,
+            evaluation_periods=1,
+            alarm_description="Alert when WAF blocks excessive requests",
         )
