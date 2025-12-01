@@ -45,6 +45,12 @@ This stack implements AWS Well-Architected Framework **REL05-BP02: Throttle requ
 
 These limits protect the API from sudden traffic spikes, retry storms, and flooding attacks. When limits are exceeded, API Gateway returns `429 Too Many Requests` responses.
 
+**AWS WAF Per-IP Rate Limiting:**
+- **Rate Limit**: 2000 requests per 5 minutes per IP address
+- **Action**: Block requests exceeding limit
+
+AWS WAF provides an additional layer of protection by limiting requests from individual IP addresses, preventing a single malicious actor or misconfigured client from consuming all available capacity.
+
 **Lambda Reserved Concurrency:**
 - **Reserved Concurrent Executions**: 50
 
@@ -55,6 +61,8 @@ Reserved concurrency limits the maximum number of concurrent executions for this
 Monitor throttled requests in CloudWatch:
 - Navigate to CloudWatch Metrics → API Gateway
 - View `4XXError` metric for throttled request counts
+- Navigate to CloudWatch Metrics → WAFV2
+- View `BlockedRequests` metric for WAF-blocked requests
 - Navigate to CloudWatch Metrics → Lambda
 - View `ConcurrentExecutions` metric to monitor function concurrency
 - CloudWatch Alarms trigger when thresholds are exceeded
@@ -157,6 +165,12 @@ This stack includes comprehensive monitoring and logging:
 - **Lambda Duration Alarm**: Triggers when execution exceeds 10 seconds
 - **API Throttle Alarm**: Triggers when API Gateway throttles requests
 - **Lambda Concurrency Alarm**: Triggers when function approaches concurrency limit (90% of reserved)
+- **WAF Blocked Requests Alarm**: Triggers when WAF blocks excessive requests
+
+### AWS WAF
+- Navigate to AWS WAF console to view blocked requests
+- Review sampled requests to identify attack patterns
+- Adjust rate limits based on legitimate traffic patterns
 
 ## Cleanup 
 Run below script to delete AWS resources created by this sample stack.
