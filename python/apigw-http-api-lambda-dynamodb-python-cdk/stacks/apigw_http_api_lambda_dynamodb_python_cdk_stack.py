@@ -112,12 +112,14 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
             retention=logs_.RetentionDays.ONE_YEAR,
         )
 
-        # Create API Gateway with X-Ray tracing and access logging enabled
+        # Create API Gateway with X-Ray tracing, access logging, and throttling enabled
         api = apigw_.LambdaRestApi(
             self,
             "Endpoint",
             handler=api_hanlder,
             deploy_options=apigw_.StageOptions(
+                throttling_rate_limit=100,
+                throttling_burst_limit=200,
                 tracing_enabled=True,
                 access_log_destination=apigw_.LogGroupLogDestination(api_log_group),
                 access_log_format=apigw_.AccessLogFormat.json_with_standard_fields(
@@ -151,4 +153,19 @@ class ApigwHttpApiLambdaDynamodbPythonCdkStack(Stack):
             threshold=Duration.seconds(10).to_milliseconds(),
             evaluation_periods=2,
             alarm_description="Alert when Lambda duration exceeds 10 seconds",
+        )
+
+        # CloudWatch Alarm for API Gateway throttled requests
+        api_throttle_alarm = cloudwatch_.Alarm(
+            self,
+            "ApiThrottleAlarm",
+            metric=cloudwatch_.Metric(
+                namespace="AWS/ApiGateway",
+                metric_name="Count",
+                dimensions_map={"ApiName": api.rest_api_name},
+                statistic="Sum"
+            ).with_label("4XXError"),
+            threshold=50,
+            evaluation_periods=1,
+            alarm_description="Alert when API Gateway throttles requests",
         )
